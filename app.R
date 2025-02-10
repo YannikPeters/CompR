@@ -5,7 +5,7 @@ library(ggplot2)
 library(wordcloud)
 library(tm)
 library(topicmodels)
-library(syuzhet)
+library(sentimentr)
 
 # Define UI (User Interface)
 ui <- fluidPage(
@@ -111,16 +111,22 @@ server <- function(input, output) {
     wordcloud(corpus, max.words = 100, random.order = FALSE, colors = brewer.pal(8, "Dark2"))
   })
   
-  # Perform Topic Modeling on removed posts
+  # Perform Topic Modeling on removed posts with dynamic topic selection
   output$topics <- renderPlot({
     req(removed_posts())
     
     text_data <- removed_posts()$text
+    num_docs <- length(text_data)  # Count the number of documents
     
-    if (is.null(text_data) || length(text_data) == 0) {
+    if (is.null(text_data) || num_docs == 0) {
       showNotification("Error: No text data available for topic modeling.", type = "error")
       return(NULL)
     }
+    
+    # Dynamic selection of the number of topics
+    k <- ifelse(num_docs < 10, 1,
+                ifelse(num_docs < 30, 2,
+                       ifelse(num_docs < 100, 3, 5)))
     
     # Create a document-term matrix
     corpus <- Corpus(VectorSource(text_data))
@@ -135,15 +141,15 @@ server <- function(input, output) {
     }
     
     # Apply Latent Dirichlet Allocation (LDA) for topic modeling
-    lda_model <- LDA(dtm, k = 3, control = list(seed = 123))
+    lda_model <- LDA(dtm, k = k, control = list(seed = 123))
     topics <- terms(lda_model, 5)
     
     # Create a bar plot for the top words
     barplot(sort(rowSums(as.matrix(dtm)), decreasing = TRUE)[1:10], las = 2, col = "lightblue",
-            main = "Top 10 Words in Removed Posts")
+            main = paste("Top 10 Words (", k, "Topics)"))
   })
   
-  # Perform Sentiment Analysis on removed posts
+  # Perform Sentiment Analysis on removed posts using `sentimentr`
   output$sentiment_plot <- renderPlot({
     req(removed_posts())
     
@@ -154,11 +160,11 @@ server <- function(input, output) {
       return(NULL)
     }
     
-    # Compute sentiment scores using the Bing method
-    sentiment_scores <- get_sentiment(text_data, method = "bing")
+    # Compute sentiment scores using sentimentr
+    sentiment_scores <- sentiment(text_data)
     
     # Create a histogram of sentiment scores
-    ggplot(data.frame(sentiment = sentiment_scores), aes(x = sentiment)) + 
+    ggplot(sentiment_scores, aes(x = sentiment)) + 
       geom_histogram(binwidth = 0.1, fill = "blue", alpha = 0.7) +
       labs(title = "Sentiment Distribution", x = "Sentiment Score", y = "Frequency") +
       theme_minimal()
@@ -167,3 +173,4 @@ server <- function(input, output) {
 
 # Run the Shiny App
 shinyApp(ui, server)
+
