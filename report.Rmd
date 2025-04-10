@@ -1,0 +1,39 @@
+
+---
+title: "Edited Posts Report"
+output: pdf_document
+params:
+  edited_posts: NA
+  date1: NA
+  date2: NA
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(knitr)
+library(kableExtra)
+```
+
+## Edited Posts Analysis
+Date Range: `r format(as.Date(params$date1), "%B %d, %Y")` to `r format(as.Date(params$date2), "%B %d, %Y")`
+
+Total Edited Posts: `r nrow(params$edited_posts)`
+
+## Summary Statistics
+```{r}
+summary_stats <- data.frame(
+  Metric = c("Mean Edit Distance", "Mean Normalized Distance"),
+  Value = c(round(mean(params$edited_posts$edit_distance), 2), 
+            round(mean(params$edited_posts$normalized_distance), 3))
+)
+
+kable(summary_stats, format = "latex", booktabs = TRUE) %>%
+  kable_styling(latex_options = "striped")
+```
+
+## Top 20 Most Edited Posts
+```{r}
+top_edited <- head(params$edited_posts[order(-params$edited_posts$edit_distance),], 20)
+kable(top_edited, format = "latex", booktabs = TRUE) %>%
+  kable_styling(latex_options = c("striped", "scale_down"))
+```
